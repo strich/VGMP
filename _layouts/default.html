@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang | default: " en-US" }}" class="dark">
+
+<head>
+  <meta charset='utf-8'>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+  <link rel="stylesheet" href="//cdn.datatables.net/2.1.8/css/dataTables.dataTables.min.css">
+  <link href="//cdn.datatables.net/rowgroup/1.5.0/css/rowGroup.dataTables.min.css" rel="stylesheet" type="text/css" />
+  <link href="//cdn.datatables.net/scroller/2.3.0/css/scroller.dataTables.min.css" rel="stylesheet" type="text/css" />
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  {% include head-custom.html %}
+  <style>
+    .container { max-width: 100%; margin: 10px; }
+    section { max-width: none !important; margin-top: unset; }
+    .dataTable { font-size: 12px; }
+    .dataTable th, .dataTable td { padding: 4px; }
+    .error-highlight { background-color: rgba(255, 0, 0, 0.1) !important; }
+
+    /* Dark mode styling for filter fields */
+    input.column-filter, .select2-container--default .select2-selection--multiple {
+      background-color: #2c2c2c;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 4px;
+      width: 100%;
+    }
+
+    input.column-filter::placeholder {
+      color: #888;
+    }
+
+    /* Ensure input fields are not sorting columns */
+    th input.column-filter, th .select2-container {
+      pointer-events: all;
+    }
+
+    #total-size {
+      color: #fff;
+      margin-bottom: 10px;
+    }
+
+    /* Scroller specific styles */
+    div.dataTables_scrollBody {
+      height: 60vh !important;
+    }
+
+    /* Select2 dark mode styles */
+    .select2-dropdown {
+      background-color: #2c2c2c;
+      color: #fff;
+    }
+
+    .select2-container--default .select2-results__option[aria-selected=true] {
+      background-color: #444;
+    }
+
+    .select2-container--default .select2-results__option--highlighted[aria-selected] {
+      background-color: #666;
+    }
+
+    .select2-container--default .select2-selection--multiple .select2-selection__choice {
+      background-color: #444;
+      color: #fff;
+    }
+
+    .select2-container--default .select2-selection--multiple {
+      background-color: #2c2c2c;
+      border-color: #444;
+    }
+
+    .select2-container--default .select2-search--dropdown .select2-search__field {
+      background-color: #2c2c2c;
+      color: #fff;
+    }
+    .select2-container--default .select2-search--inline .select2-search__field {
+      background-color: #2c2c2c;
+      color: #fff;
+    }
+
+    /* Fix for select dropdown styling */
+    .select2-container {
+      width: 100% !important;
+      min-width: 200px;
+    }
+
+    /* New styles for column max-width */
+    .dataTable td:nth-child(2),
+    .dataTable td:nth-child(3),
+    .dataTable td:nth-child(18) {
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .dataTable td:nth-child(20),
+    .dataTable td:nth-child(21) {
+      max-width: 150px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* New styles for all columns */
+    .dataTable td {
+      max-width: 150px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+  </style>
+  {% seo %}
+</head>
+
+<body>
+
+  <header>
+    <div class="container">
+      <a id="a-title" href="{{ '/' | relative_url }}">
+        <h1>{{ site.title | default: site.github.repository_name }}</h1>
+      </a>
+    </div>
+  </header>
+
+  <div class="container">
+    <section>
+      {{ content }}
+    </section>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+  <script src="//cdn.datatables.net/2.1.8/js/dataTables.min.js"></script>
+  <script src="//cdn.datatables.net/rowgroup/1.5.0/js/dataTables.rowGroup.min.js"></script>
+  <script src="//cdn.datatables.net/scroller/2.3.0/js/dataTables.scroller.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+  <script>
+    function getColorForScore(score, alpha) {
+      // Ensure the score is between 0 and 10
+      score = Math.max(0, Math.min(10, score));
+
+      // Calculate the red, green and blue components
+      let red = score < 5 ? 255 : Math.floor(255 - (score - 5) * 51);
+      let green = score > 5 ? 255 : Math.floor(score * 51);
+      let blue = 0;
+
+      return `rgb(${red},${green},${blue},${alpha})`;
+    }
+
+    function formatFileSize(sizeBytes) {
+      let input = BigInt(sizeBytes);
+      const oneTiB = 1099511627776n; // 1024^4
+      const oneGiB = 1073741824n;    // 1024^3
+      const oneMiB = 1048576n;       // 1024^2
+      const oneKiB = 1024n;          // 1024^1
+
+      if (input >= oneTiB) { // Greater than or equal to 1 TiB
+        let sizeTiB = (input * 100n) / oneTiB;  // Multiply by 100 to shift two decimals
+        return `${(sizeTiB / 100n)}.${(sizeTiB % 100n).toString().padStart(2, '0')} TiB`;
+      } else if (input >= oneGiB) { // Greater than or equal to 1 GiB
+        let sizeGiB = (input * 100n) / oneGiB;
+        return `${(sizeGiB / 100n)}.${(sizeGiB % 100n).toString().padStart(2, '0')} GiB`;
+      } else if (input >= oneMiB) { // Greater than or equal to 1 MiB
+        let sizeMiB = (input * 100n) / oneMiB;
+        return `${(sizeMiB / 100n)}.${(sizeMiB % 100n).toString().padStart(2, '0')} MiB`;
+      } else if (input >= oneKiB) { // Greater than or equal to 1 KiB
+        return `${input / oneKiB} KiB`;
+      } else {
+        return `${input} Bytes`;
+      }
+    }
+
+    var seenTitles = new Set();
+
+    function filterDuplicates(data, info, row) {
+      if (!document.getElementById('toggle-duplicates').checked) {
+        return true;
+      }
+      var gameTitle = info[1];
+      if (seenTitles.has(gameTitle)) {
+        return false;
+      }
+      seenTitles.add(gameTitle);
+      return true;
+    }
+
+    var collapsedGroups = {};
+    $(document).ready(function () {
+      const table = document.querySelector("#data-table");
+
+      // Initialize Select2 for multi-select dropdowns
+      $('#category-filter,#platforms-filter,#region-filter,#language-filter').select2({
+        placeholder: 'Filter options',
+        allowClear: true,
+        multiple: true,
+        theme: 'default',
+        width: '100%'
+      });
+
+      // Populate dropdowns with unique values
+      var categories = [...new Set(gamesData.map(item => item.Category))];
+      var platforms = [...new Set(gamesData.flatMap(item => item.Platforms.split(',')))];
+      var regions = [...new Set(gamesData.flatMap(item => item.Region.split(', ')))];
+      var languages = [...new Set(gamesData.map(item => item.Language))];
+
+      categories.forEach(category => {
+        $('#category-filter').append(new Option(category, category));
+      });
+
+      platforms.forEach(platform => {
+        $('#platforms-filter').append(new Option(platform, platform));
+      });
+
+      regions.forEach(region => {
+        $('#region-filter').append(new Option(region, region));
+      });
+
+      languages.forEach(language => {
+        $('#language-filter').append(new Option(language, language));
+      });
+
+      var dt = new DataTable(table, {
+        data: gamesData,
+        deferRender: true,
+        scrollY: '60vh',
+        scrollCollapse: true,
+        scroller: true,
+        info: true,
+        ordering: true,
+        order: [[1, 'asc']],
+        rowGroup: {
+          dataSrc: "GameTitle",
+          startRender: function (rows, group) {
+            return;
+          }
+        },
+        columns: [
+          { 
+            data: "ID",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return `<a href="http://redump.org/disc/${data}" target="_blank">${data}</a>`;
+              }
+              return data;
+            }
+          },
+          { data: "GameTitle", width: "200px" },
+          { data: "AlternativeGameTitle", width: "200px" },
+          { data: "DiscID" },
+          { data: "Platform", width: "80px" },
+          { data: "Region", width: "50px" },
+          { data: "Language", width: "50px" },
+          { data: "Version", width: "80px" },
+          { 
+            data: "FileCRC",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return `<code>${data}</code>`;
+              }
+              return data;
+            }
+          },
+          { 
+            data: "MobyID",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return `<a href="https://www.mobygames.com/game/${data}" target="_blank">${data}</a>`;
+              }
+              return data;
+            },
+            width: "80px"
+          },
+          { data: "MobyIDConfidence", width: "50px" },
+          { data: "MobyIDVerified", width: "50px" },
+          {
+            data: "MobyScore",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                var value = Number(data).toFixed(2);
+                if (isNaN(value)) return data;
+                var color = getColorForScore(value, 0.3);
+                return `<span style="background-color: ${color};">${value}</span>`;
+              }
+              return data;
+            },
+            width: "80px"
+          },
+          { data: "CriticScore", width: "80px" },
+          { 
+            data: "UserScore",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                var value = Number(data).toFixed(2);
+                if (isNaN(value)) return data;
+                return value;
+              }
+              return data;
+            },
+            width: "80px"
+          },
+          { 
+            data: "SourceDbLastUpdatedUTC",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return moment(data).format("YYYY-MM-DD");
+              }
+              return data;
+            },
+            width: "50px"
+           },
+          { 
+            data: "LastUpdatedUTC",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return moment(data).format("YYYY-MM-DD");
+              }
+              return data;
+            },
+            width: "50px"
+          },
+          { data: "FileName", width: "200px" },
+          {
+            data: "FileSizeBytes",
+            render: function (data, type, row) {
+              if (type === 'display' || type === 'filter') {
+                return formatFileSize(data);
+              }
+              return data;
+            },
+            width: "100px"
+          },
+          { data: "Category" },
+          { data: "Platforms", width: "100px" },
+        ]
+      });
+
+      function updateTotalSize() {
+        var totalSize = dt.column(18, { filter: 'applied' }).data().reduce(function (a, b) {
+          return a + BigInt(b);
+        }, 0n);
+
+        var mobyIDs = dt.column(9, { filter: 'applied' }).data();
+        
+        var mobyConnections = mobyIDs.reduce(function (count, mobyID) {
+          return count + (mobyID != 0 ? 1 : 0);
+        }, 0);
+
+        var totalFilteredRows = mobyIDs.length;
+
+        $('#total-size').text('Total Size: ' + formatFileSize(totalSize));
+        $('#moby-connections').text('MobyGames ID Connections: ' + mobyConnections + ' of ' + totalFilteredRows);
+      }
+
+      dt.on('draw', function () {
+        updateTotalSize();
+      });
+
+      updateTotalSize();
+
+      // Add event listener for the toggle button
+      document.getElementById('toggle-duplicates').addEventListener('change', function() {
+        seenTitles.clear();
+        dt.draw();
+      });
+
+      // Add the custom filtering function
+      $.fn.dataTable.ext.search.push(filterDuplicates);
+
+      // Add event listeners for the multi-select filters
+      $('#category-filter,#platforms-filter,#region-filter,#language-filter').on('change', function() {
+        dt.draw();
+      });
+
+      // Clear Filters button functionality
+      $('#clear-filters').on('click', function() {
+        $('#category-filter,#platforms-filter,#region-filter,#language-filter').val(null).trigger('change');
+        dt.draw();
+      });
+
+      // Custom filtering function for category and platforms
+      $.fn.dataTable.ext.search.push(
+        function(settings, data, dataIndex) {
+          var selectedCategories = $('#category-filter').val();
+          var selectedPlatforms = $('#platforms-filter').val();
+          var selectedRegions = $('#region-filter').val();
+          var selectedLanguages = $('#language-filter').val();
+          var category = data[19]; // Assuming Category is the 20th column (index 19)
+          var platforms = data[20]; // Assuming Platforms is the 21st column (index 20)
+          var regions = data[5];
+          var languages = data[6];
+
+          if (selectedCategories.length === 0 && 
+              selectedPlatforms.length === 0 &&
+              selectedRegions.length === 0 &&
+              selectedLanguages.length === 0) {
+            return true;
+          }
+
+          var categoryMatch = selectedCategories.length === 0 || selectedCategories.includes(category);
+          var platformMatch = selectedPlatforms.length === 0 || selectedPlatforms.some(platform => platforms.includes(platform));
+          var regionMatch = selectedRegions.length === 0 || selectedRegions.some(platform => regions.includes(platform));
+          var languageMatch = selectedLanguages.length === 0 || selectedLanguages.some(platform => languages.includes(platform));
+
+          return categoryMatch && platformMatch && regionMatch && languageMatch;
+        }
+      );
+    });
+  </script>
+</body>
+
+</html>
