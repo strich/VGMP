@@ -267,6 +267,7 @@
             data: "MobyID",
             render: function (data, type, row) {
               if (type === 'display' || type === 'filter') {
+                if(Number(data) == 0) return data;
                 return `<a href="https://www.mobygames.com/game/${data}" target="_blank">${data}</a>`;
               }
               return data;
@@ -367,16 +368,18 @@
       });
 
       // Add the custom filtering function
-      $.fn.dataTable.ext.search.push(filterDuplicates);
+      // $.fn.dataTable.ext.search.push(filterDuplicates);
 
       // Add event listeners for the multi-select filters
       $('#category-filter,#platforms-filter,#region-filter,#language-filter').on('change', function() {
+        seenTitles.clear();
         dt.draw();
       });
 
       // Clear Filters button functionality
       $('#clear-filters').on('click', function() {
         $('#category-filter,#platforms-filter,#region-filter,#language-filter').val(null).trigger('change');
+        seenTitles.clear();
         dt.draw();
       });
 
@@ -404,7 +407,9 @@
           var regionMatch = selectedRegions.length === 0 || selectedRegions.some(platform => regions.includes(platform));
           var languageMatch = selectedLanguages.length === 0 || selectedLanguages.some(platform => languages.includes(platform));
 
-          return categoryMatch && platformMatch && regionMatch && languageMatch;
+          var marchersFilter = categoryMatch && platformMatch && regionMatch && languageMatch;
+
+          return marchersFilter && filterDuplicates(settings, data, dataIndex);
         }
       );
     });

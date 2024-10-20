@@ -16,7 +16,7 @@ title: "The Video Game Metadata Project"
             <th>Game Title</th>
             <th>Alt Game Title</th>
             <th>Disc ID</th>
-            <th>Platform</th>
+            <th>Redump Platform</th>
             <th>Region</th>
             <th>Language</th>
             <th>Version</th>
@@ -32,7 +32,7 @@ title: "The Video Game Metadata Project"
             <th>File Name</th>
             <th>Size</th>
             <th>Category</th>
-            <th>Platforms</th>
+            <th>Moby Platforms</th>
         </tr>
         <tr data-dt-order="disable">
             <th></th>
